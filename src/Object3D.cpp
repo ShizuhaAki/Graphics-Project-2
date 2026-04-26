@@ -1,4 +1,5 @@
 #include "Object3D.h"
+#include "Matrix3f.h"
 #include "Vector3f.h"
 
 bool Sphere::intersect(const Ray &r, float tmin, Hit &h) const {
@@ -87,8 +88,30 @@ bool Plane::intersect(const Ray &r, float tmin, Hit &h) const {
     return true;
 }
 bool Triangle::intersect(const Ray &r, float tmin, Hit &h) const {
-    // TODO implement
-    return false;
+    auto edge1 = _v[1] - _v[0], edge2 = _v[2] - _v[0];
+    Matrix3f A(-r.getDirection(), edge1, edge2);
+    bool singular = false;
+    Matrix3f invA = A.inverse(&singular, 1e-8f);
+    if (singular) {
+        return false;
+    }
+    Vector3f x = invA * (r.getOrigin() - _v[0]);
+    float t = x[0];
+    float u = x[1];
+    float v = x[2];
+    if (u < 0 || u > 1) {
+        return false;
+    }
+    if (v < 0 || u + v > 1) {
+        return false;
+    }
+    if (t <= tmin || t >= h.getT()) {
+        return false;
+    }
+    float w = 1 - u - v;
+    auto n = (w * _normals[0] + u * _normals[1] + v * _normals[2]).normalized();
+    h.set(t, material, n);
+    return true;
 }
 
 Transform::Transform(const Matrix4f &m, Object3D *obj) : _object(obj) {
