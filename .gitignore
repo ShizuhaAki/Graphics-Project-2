@@ -1,0 +1,32 @@
+# CMake and native build output
+/build/
+/out/
+/cmake-build-*/
+/sample_solution/
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Compiler and editor metadata
+/compile_commands.json
+/.cache/
+.DS_Store
+
+# Python UI environment and bytecode
+/ui/.venv/
+/ui/__pycache__/
+*.py[cod]
+
+# Local tool metadata
+.codex
+*.png
+data
+
+# Generated render outputs
+/sample_out/
+/ui/runs/
+/ui/reference/
