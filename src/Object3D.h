@@ -2,6 +2,7 @@
 #define OBJECT3D_H
 
 #include "Material.h"
+#include "Matrix4f.h"
 #include "Ray.h"
 
 #include <string>
@@ -114,6 +115,7 @@ class Transform : public Object3D {
 
   private:
     Object3D *_object; // un-transformed object
+    Matrix4f m;
 };
 
 #endif

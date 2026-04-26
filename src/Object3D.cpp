@@ -1,6 +1,7 @@
 #include "Object3D.h"
 #include "Matrix3f.h"
 #include "Vector3f.h"
+#include "Vector4f.h"
 
 bool Sphere::intersect(const Ray &r, float tmin, Hit &h) const {
     // BEGIN STARTER
@@ -114,10 +115,27 @@ bool Triangle::intersect(const Ray &r, float tmin, Hit &h) const {
     return true;
 }
 
-Transform::Transform(const Matrix4f &m, Object3D *obj) : _object(obj) {
+Transform::Transform(const Matrix4f &m, Object3D *obj) : _object(obj),  m(m) {
     // TODO implement Transform constructor
 }
 bool Transform::intersect(const Ray &r, float tmin, Hit &h) const {
-    // TODO implement
-    return false;
+    bool singular = false;
+    auto minv = m.inverse(&singular, 1e-8f);
+    if (singular) {
+        return false;
+    }
+
+    auto newOrigin = (minv * Vector4f(r.getOrigin(), 1.0f)).xyz();
+    auto newDirection = (minv * Vector4f(r.getDirection(), 0.0f)).xyz();
+    Ray newRay{newOrigin, newDirection};
+
+    Hit hit;
+    if (!_object->intersect(newRay, tmin, hit)) {
+        return false;
+    }
+
+    auto newNormal =
+        (minv.getSubmatrix3x3(0, 0).transposed() * hit.getNormal()).normalized();
+    h.set(hit.getT(), hit.getMaterial(), newNormal);
+    return true;
 }
