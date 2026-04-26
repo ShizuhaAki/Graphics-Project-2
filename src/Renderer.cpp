@@ -69,14 +69,13 @@ void Renderer::Render() {
 Vector3f Renderer::traceRay(const Ray &r, float tmin, int bounces,
                             Hit &h) const {
     if (!_scene.getGroup()->intersect(r, tmin, h)) {
-        return Vector3f::ZERO;
+        return _scene.getBackgroundColor(r.getDirection());
     }
     auto material = h.getMaterial();
     Vector3f color = _scene.getAmbientLight() * material->getDiffuseColor();
     auto hitPoint = r.pointAtParameter(h.getT());
     auto normal = h.getNormal().normalized();
     for (auto light : _scene.lights) {
-        // auto light = _scene.getLight(i);
         Vector3f dirToLight, lightIntensity;
         float distToLight;
         light->getIllumination(hitPoint, dirToLight, lightIntensity,
