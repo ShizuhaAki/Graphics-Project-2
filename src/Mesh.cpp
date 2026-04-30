@@ -78,7 +78,7 @@ Mesh::Mesh(const std::string &filename, Material *material)
     // will smooth normals.
     // if sharp edges required, build OBJ with no shared vertices.
     n.resize(v.size());
-    for (int ii = 0; ii < t.size(); ii++) {
+    for (size_t ii = 0; ii < t.size(); ii++) {
         Vector3f a = v[t[ii][1]] - v[t[ii][0]];
         Vector3f b = v[t[ii][2]] - v[t[ii][0]];
         Vector3f normal = Vector3f::cross(a, b).normalized();
@@ -86,12 +86,12 @@ Mesh::Mesh(const std::string &filename, Material *material)
             n[t[ii][jj]] += normal;
         }
     }
-    for (int ii = 0; ii < v.size(); ii++) {
+    for (size_t ii = 0; ii < v.size(); ++ii) {
         n[ii] = n[ii] / n[ii].abs();
     }
 
     // Set up triangles
-    for (int i = 0; i < t.size(); i++) {
+    for (size_t i = 0; i < t.size(); i++) {
         Triangle triangle(v[t[i][0]], v[t[i][1]], v[t[i][2]], n[t[i][0]],
                           n[t[i][1]], n[t[i][2]], getMaterial());
         _triangles.push_back(triangle);

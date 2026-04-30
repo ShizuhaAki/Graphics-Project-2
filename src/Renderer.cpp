@@ -50,6 +50,11 @@ void Renderer::Render() {
                 nimage.setPixel(x, y, Vector3f::ZERO);
                 dimage.setPixel(x, y, Vector3f::ZERO);
             }
+    
+            /* Vector3f n = h.getNormal();
+            if ((n + Vector3f(1, 1, 1)).absSquared() < 1e-6) {
+                std::cerr << "Black!!!: (" << x << ", " << y << "): " << n << std::endl;
+            } */
         }
     }
     // END SOLN
@@ -66,21 +71,39 @@ void Renderer::Render() {
     }
 }
 
-Vector3f Renderer::traceRay(const Ray &r, float tmin, int bounces,
-                            Hit &h) const {
+Vector3f Renderer::traceRay(const Ray &r, float tmin, int bounces, Hit &h) const {
+    // std::cerr << tmin << " " << bounces << "\n";
     if (!_scene.getGroup()->intersect(r, tmin, h)) {
         return _scene.getBackgroundColor(r.getDirection());
     }
-    auto material = h.getMaterial();
+    const auto material = h.getMaterial();
     Vector3f color = _scene.getAmbientLight() * material->getDiffuseColor();
-    auto hitPoint = r.pointAtParameter(h.getT());
-    auto normal = h.getNormal().normalized();
+    const auto hitPoint = r.pointAtParameter(h.getT());
+    const auto normal = h.getNormal().normalized();
+    constexpr static float epsilon = 1e-4f;
     for (auto light : _scene.lights) {
         Vector3f dirToLight, lightIntensity;
         float distToLight;
-        light->getIllumination(hitPoint, dirToLight, lightIntensity,
-                               distToLight);
-        color += material->shade(r, h, dirToLight, lightIntensity);
+        light->getIllumination(hitPoint, dirToLight, lightIntensity, distToLight);
+        Ray shadowRay(hitPoint + epsilon * dirToLight, dirToLight);
+        Hit shadowHit;
+        bool shadow = (
+            _scene.getGroup()->intersect(shadowRay, epsilon, shadowHit) && (
+                std::isinf(distToLight) || shadowHit.getT() < distToLight - epsilon
+            )
+        );
+        if (!shadow) {
+            color += material->shade(r, h, dirToLight, lightIntensity);
+        }
+    }
+    if (bounces > 0) {
+        Vector3f specularColor = material->getSpecularColor();
+        if (specularColor != Vector3f::ZERO) {
+            Vector3f L = r.getDirection().normalized();
+            Vector3f R = (L - 2.0f * Vector3f::dot(L, normal) * normal).normalized();
+            Hit reflectHit;
+            color += specularColor * traceRay(Ray(hitPoint + epsilon * R, R), tmin, bounces - 1, reflectHit);
+        }
     }
     return color;
 }
