@@ -122,33 +122,6 @@ bool Triangle::intersect(const Ray &r, float tmin, Hit &h) const {
 }
 
 Transform::Transform(const Matrix4f &m, Object3D *obj) : _object(obj),  m(m) {}
-/* bool Transform::intersect(const Ray &r, float tmin, Hit &h) const {
-    bool Transform::intersect(const Ray &r, float tmin, Hit &h) const {
-    bool singular = false;
-    Matrix4f invM = m.inverse(&singular, 1e-8f);
-    if (singular) return false;
-
-    Vector3f newOrigin = (invM * Vector4f(r.getOrigin(), 1.0f)).xyz();
-    Vector3f newDirection = (invM * Vector4f(r.getDirection(), 0.0f)).xyz();
-    Ray newRay(newOrigin, newDirection);
-
-    Hit hit;
-    if (!_object->intersect(newRay, tmin, hit)) return false;
-
-    Vector3f localPoint = newRay.pointAtParameter(hit.getT());
-    Vector3f worldPoint = (m * Vector4f(localPoint, 1.0f)).xyz();
-
-    Vector3f diff = worldPoint - r.getOrigin();
-    float t_world = Vector3f::dot(diff, r.getDirection()) / r.getDirection().absSquared();
-
-    if (t_world <= tmin || t_world >= h.getT()) return false;
-
-    Matrix3f normalMatrix = invM.getSubmatrix3x3(0, 0).transposed();
-    Vector3f worldNormal = (normalMatrix * hit.getNormal()).normalized();
-
-    h.set(t_world, hit.getMaterial(), worldNormal);
-    return true;
-} */
 bool Transform::intersect(const Ray &r, float tmin, Hit &h) const {
     bool singular = false;
     auto minv = m.inverse(&singular, 1e-8f);
