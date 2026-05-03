@@ -90,6 +90,11 @@ bool Plane::intersect(const Ray &r, float tmin, Hit &h) const {
 }
 bool Triangle::intersect(const Ray &r, float tmin, Hit &h) const {
     auto edge1 = _v[1] - _v[0], edge2 = _v[2] - _v[0];
+    /* Vector3f faceDir = Vector3f::cross(edge1, edge2);
+    if (Vector3f::dot(r.getDirection(), faceDir) > 0) {
+        return false;
+    } */
+    
     Matrix3f A(-r.getDirection(), edge1, edge2);
     bool singular = false;
     Matrix3f invA = A.inverse(&singular, 1e-8f);
@@ -110,20 +115,20 @@ bool Triangle::intersect(const Ray &r, float tmin, Hit &h) const {
         return false;
     }
     float w = 1 - u - v;
+    // auto n = (Vector3f::cross(edge1, edge2)).normalized();
     auto n = (w * _normals[0] + u * _normals[1] + v * _normals[2]).normalized();
     h.set(t, material, n);
     return true;
 }
 
-Transform::Transform(const Matrix4f &m, Object3D *obj) : _object(obj),  m(m) {
-    // TODO implement Transform constructor
-}
+Transform::Transform(const Matrix4f &m, Object3D *obj) : _object(obj),  m(m) {}
 bool Transform::intersect(const Ray &r, float tmin, Hit &h) const {
     bool singular = false;
     auto minv = m.inverse(&singular, 1e-8f);
-    if (singular) {
+    assert(!singular);
+    /* if (singular) {
         return false;
-    }
+    } */
 
     auto newOrigin = (minv * Vector4f(r.getOrigin(), 1.0f)).xyz();
     auto newDirection = (minv * Vector4f(r.getDirection(), 0.0f)).xyz();
@@ -134,8 +139,21 @@ bool Transform::intersect(const Ray &r, float tmin, Hit &h) const {
         return false;
     }
 
-    auto newNormal =
-        (minv.getSubmatrix3x3(0, 0).transposed() * hit.getNormal()).normalized();
+    Vector3f Q = (
+        m * Vector4f(newRay.pointAtParameter(hit.getT()), 1.0f)
+    ).xyz();
+
+    const auto rO = r.getOrigin(), rD = r.getDirection();
+    const float T = Vector3f::dot(Q - rO, rD) / rD.absSquared();
+
+    if (T <= tmin || T >= h.getT()) {
+        return false;
+    }
+
+    auto newNormal = (
+        minv.getSubmatrix3x3(0, 0).transposed() * hit.getNormal()
+    ).normalized();
     h.set(hit.getT(), hit.getMaterial(), newNormal);
+    // h.set(T, hit.getMaterial(), newNormal);
     return true;
 }
