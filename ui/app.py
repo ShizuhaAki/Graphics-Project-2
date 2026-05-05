@@ -153,6 +153,8 @@ def render_args(
     height: int,
     bounces: int,
     shadows: bool,
+    jitter: bool,
+    filter_enabled: bool,
     normals_enabled: bool,
     depth_enabled: bool,
     depth_min: float,
@@ -175,6 +177,12 @@ def render_args(
 
     if int(bounces):
         args.extend(["-bounces", str(int(bounces))])
+
+    if jitter:
+        args.append("-jitter")
+
+    if filter_enabled:
+        args.append("-filter")
 
     if normals_enabled:
         args.extend(["-normals", str(paths["normals"])])
@@ -274,6 +282,8 @@ def render_scene(
     height: int,
     bounces: int,
     shadows: bool,
+    jitter: bool,
+    filter_enabled: bool,
     normals_enabled: bool,
     depth_enabled: bool,
     depth_min: float,
@@ -295,6 +305,8 @@ def render_scene(
         int(height),
         int(bounces),
         bool(shadows),
+        bool(jitter),
+        bool(filter_enabled),
         bool(normals_enabled),
         bool(depth_enabled),
         float(depth_min),
@@ -326,6 +338,8 @@ def build_and_render(*args):
 
 def render_full_sample_suite(
     scene_label: str,
+    jitter: bool,
+    filter_enabled: bool,
     log: str,
 ):
     if not BIN_PATH.exists():
@@ -343,6 +357,8 @@ def render_full_sample_suite(
             800,
             scene.default_bounces,
             scene.default_shadows,
+            bool(jitter),
+            bool(filter_enabled),
             True,
             True,
             scene.default_depth_min,
@@ -391,6 +407,7 @@ first_scene = SCENES[0]
 with gr.Blocks(title="A2 Render Workbench") as demo:
     gr.Markdown("# A2 Render Workbench")
     gr.Markdown("Build, render, inspect logs, and compare against sample outputs.")
+    gr.Markdown("Sampling options pass `-jitter` and `-filter` to both user and reference renders.")
 
     status = gr.Textbox(label="Status", interactive=False)
     log = gr.Textbox(label="Log", lines=18, value="", interactive=False)
@@ -414,6 +431,8 @@ with gr.Blocks(title="A2 Render Workbench") as demo:
             bounces = gr.Number(label="Bounces", value=first_scene.default_bounces, precision=0)
 
             shadows = gr.Checkbox(label="Enable shadows", value=first_scene.default_shadows)
+            jitter = gr.Checkbox(label="Enable jitter sampling", value=False)
+            filter_enabled = gr.Checkbox(label="Enable gaussian filter", value=False)
             normals_enabled = gr.Checkbox(label="Write normals image", value=True)
             depth_enabled = gr.Checkbox(label="Write depth image", value=True)
 
@@ -467,6 +486,8 @@ with gr.Blocks(title="A2 Render Workbench") as demo:
         height,
         bounces,
         shadows,
+        jitter,
+        filter_enabled,
         normals_enabled,
         depth_enabled,
         depth_min,
@@ -502,7 +523,7 @@ with gr.Blocks(title="A2 Render Workbench") as demo:
 
     suite_btn.click(
         fn=render_full_sample_suite,
-        inputs=[scene_select, log],
+        inputs=[scene_select, jitter, filter_enabled, log],
         outputs=[*preview_components, log, status],
     )
 

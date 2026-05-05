@@ -23,6 +23,7 @@ GRADIO_SERVER_PORT=8080 python3 ui/app.py
 
 - Builds the project with `cmake --build build`
 - Runs `build/a2` with scene and image options from the page
+- Supports the renderer's `-jitter` and `-filter` sampling flags from the UI
 - Writes generated images to `ui/runs/`
 - Shows generated outputs next to reference renders from `sample_solution/athena/a2`
 - Logs the exact commands and their stdout/stderr

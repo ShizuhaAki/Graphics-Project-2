@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fdiagnostics-color=always -fsanitize=undefined -fsanitize-recover=undefined -g")
-
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fdiagnostics-color=always -O2 -g")
+set(CMAKE_CXX_STANDARD 17)
 
 project(a2)
 
@@ -11,8 +11,6 @@ if(APPLE)
 endif()
 
 if(UNIX)
-    # Enable C++11
-    add_definitions("-std=c++11")
 elseif(MSVC)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -WX")
   add_definitions("-D_CRT_SECURE_NO_WARNINGS")

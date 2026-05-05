@@ -6,17 +6,23 @@
 #include "Ray.h"
 #include "VecUtils.h"
 #include "Vector3f.h"
-
-#include <limits>
+#include <random>
 
 Renderer::Renderer(const ArgParser &args)
     : _args(args), _scene(args.input_file) {}
 
+std::mt19937 rng(42);
+std::uniform_real_distribution<float> dist(-1, 1);
 void Renderer::Render() {
     int w = _args.width;
     int h = _args.height;
 
-    Image image(w, h);
+    if (_args.filter) {
+        w *= 3;
+        h *= 3;
+    }
+
+    Image cimage(w, h);
     Image nimage(w, h);
     Image dimage(w, h);
 
@@ -31,37 +37,75 @@ void Renderer::Render() {
         float ndcy = 2 * (y / (h - 1.0f)) - 1.0f;
         for (int x = 0; x < w; ++x) {
             float ndcx = 2 * (x / (w - 1.0f)) - 1.0f;
-            // Use PerspectiveCamera to generate a ray.
-            // You should understand what generateRay() does.
-            Ray r = cam->generateRay(Vector2f(ndcx, ndcy));
-
-            Hit h;
-            Vector3f color = traceRay(r, cam->getTMin(), _args.bounces, h);
-
-            image.setPixel(x, y, color);
-            if (h.getMaterial() != nullptr) {
-                nimage.setPixel(x, y, (h.getNormal() + 1.0f) / 2.0f);
-                float range = (_args.depth_max - _args.depth_min);
-                if (range) {
-                    dimage.setPixel(
-                        x, y, Vector3f((h.t - _args.depth_min) / range));
+            // Jitter handling:
+            // Perform jitter perturbation for the 3 images
+            Vector3f totcolor, totnormal;
+            float totdepth = 0.0f;
+            if (_args.jitter) {
+                for (int i = 0; i < 16; i++) {
+                    float jx = dist(rng) / w;
+                    float jy = dist(rng) / h ;
+                    auto ray = cam->generateRay({ndcx + jx, ndcy + jy});
+                    Hit hit;
+                    totcolor +=
+                        traceRay(ray, cam->getTMin(), _args.bounces, hit);
+                    totdepth += hit.getT();
+                    totnormal += (hit.getNormal() + 1.0f) / 2.0f;
                 }
+                totcolor /= 16;
+                totnormal /= 16;
+                totdepth /= 16;
             } else {
-                nimage.setPixel(x, y, Vector3f::ZERO);
-                dimage.setPixel(x, y, Vector3f::ZERO);
+                Ray r = cam->generateRay(Vector2f(ndcx, ndcy));
+
+                Hit h;
+                totcolor = traceRay(r, cam->getTMin(), _args.bounces, h);
+                totnormal = (h.getNormal() + 1.0f) / 2.0f;
+                totdepth = h.getT();
             }
-    
-            /* Vector3f n = h.getNormal();
-            if ((n + Vector3f(1, 1, 1)).absSquared() < 1e-6) {
-                std::cerr << "Black!!!: (" << x << ", " << y << "): " << n << std::endl;
-            } */
+
+            cimage.setPixel(x, y, totcolor);
+            nimage.setPixel(x, y, totnormal);
+            dimage.setPixel(x, y, Vector3f((totdepth - _args.depth_min) / (_args.depth_max - _args.depth_min)));
         }
     }
-    // END SOLN
+    // Gaussian filtering
+    if (_args.filter) {
+        auto true_w = _args.width, true_h = _args.height;
+        Image fcimage(true_w, true_h);
+        Image fnimage(true_w, true_h);
+        Image fdimage(true_w, true_h);
+
+        // clang-format off
+        auto fkernel = Matrix3f(
+            1, 2, 1,
+            2, 4, 2,
+            1, 2, 1
+        ) * (1.0f / 16.0f);
+        // clang-format on
+        for (int y = 0; y < true_h; y++) {
+            for (int x = 0; x < true_w; x++) {
+                Vector3f fcolor, fnormal, fdepth;
+                for (int ki = 0; ki < 3; ki++) {
+                    for (int kj = 0; kj < 3; kj++) {
+                        fcolor += fkernel(ki, kj) * cimage.getPixel(3 * x + ki, 3 * y + kj);
+                        fnormal += fkernel(ki, kj) * nimage.getPixel(3 * x + ki, 3 * y + kj);
+                        fdepth += fkernel(ki, kj) * dimage.getPixel(3 * x + ki, 3 * y + kj);
+                    }
+                }
+                fcimage.setPixel(x, y, fcolor);
+                fnimage.setPixel(x, y, fnormal);
+                fdimage.setPixel(x, y, fdepth);
+            }
+        }
+        cimage = fcimage;
+        nimage = fnimage;
+        dimage = fdimage;
+    }
 
     // save the files
     if (_args.output_file.size()) {
-        image.savePNG(_args.output_file);
+        cimage.savePNG(_args.output_file);
     }
     if (_args.depth_file.size()) {
         dimage.savePNG(_args.depth_file);
@@ -71,7 +115,8 @@ void Renderer::Render() {
     }
 }
 
-Vector3f Renderer::traceRay(const Ray &r, float tmin, int bounces, Hit &h) const {
+Vector3f Renderer::traceRay(const Ray &r, float tmin, int bounces,
+                            Hit &h) const {
     // std::cerr << tmin << " " << bounces << "\n";
     if (!_scene.getGroup()->intersect(r, tmin, h)) {
         return _scene.getBackgroundColor(r.getDirection());
@@ -84,14 +129,14 @@ Vector3f Renderer::traceRay(const Ray &r, float tmin, int bounces, Hit &h) const
     for (auto light : _scene.lights) {
         Vector3f dirToLight, lightIntensity;
         float distToLight;
-        light->getIllumination(hitPoint, dirToLight, lightIntensity, distToLight);
+        light->getIllumination(hitPoint, dirToLight, lightIntensity,
+                               distToLight);
         Ray shadowRay(hitPoint + epsilon * dirToLight, dirToLight);
         Hit shadowHit;
-        bool shadow = (
-            _scene.getGroup()->intersect(shadowRay, epsilon, shadowHit) && (
-                std::isinf(distToLight) || shadowHit.getT() < distToLight - epsilon
-            )
-        );
+        bool shadow =
+            (_scene.getGroup()->intersect(shadowRay, epsilon, shadowHit) &&
+             (std::isinf(distToLight) ||
+              shadowHit.getT() < distToLight - epsilon));
         if (!shadow) {
             color += material->shade(r, h, dirToLight, lightIntensity);
         }
@@ -100,9 +145,11 @@ Vector3f Renderer::traceRay(const Ray &r, float tmin, int bounces, Hit &h) const
         Vector3f specularColor = material->getSpecularColor();
         if (specularColor != Vector3f::ZERO) {
             Vector3f L = r.getDirection().normalized();
-            Vector3f R = (L - 2.0f * Vector3f::dot(L, normal) * normal).normalized();
+            Vector3f R =
+                (L - 2.0f * Vector3f::dot(L, normal) * normal).normalized();
             Hit reflectHit;
-            color += specularColor * traceRay(Ray(hitPoint + epsilon * R, R), tmin, bounces - 1, reflectHit);
+            color += specularColor * traceRay(Ray(hitPoint + epsilon * R, R),
+                                              tmin, bounces - 1, reflectHit);
         }
     }
     return color;
